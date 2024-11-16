@@ -1,104 +1,175 @@
-Instructions for Using the APRS Image Generation Script
+Full Script: APRS Image Generator
 
-This script processes a real-time APRS log file and generates an image displaying selected APRS data. The script is highly configurable, allowing users to pass various parameters through the command line.
-How to Run the Script
+This script parses the Direwolf comma-delimited log in real time and generates an image displaying selected information. It allows you to customize the appearance and data selection via command-line arguments.
 
-    Ensure Prerequisites:
-        Python 3 is installed.
-        The Pillow library is installed (pip install pillow).
+import argparse
+import os
+import time
+from PIL import Image, ImageDraw, ImageFont
 
-    Run the Script:
+# Constants for default behavior
+DEFAULT_LOG_FILE = "/home/fcosta/digipi/direwolf.log"
+DEFAULT_OUTPUT_IMAGE = "/tmp/direwatch.png"
+DEFAULT_IMAGE_WIDTH = 320
+DEFAULT_IMAGE_HEIGHT = 240
+DEFAULT_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+DEFAULT_BANNER_TITLE = "APRS BPQ"
+DEFAULT_COLUMNS = ["source", "heard", "latitude", "longitude", "speed"]
+DEFAULT_BANNER_BACKGROUND_COLOR = "navy"
+DEFAULT_BANNER_TEXT_COLOR = "yellow"
+DEFAULT_ROW_TEXT_COLOR = "white"
+DEFAULT_ROW_COLORS = ["red", "green", "blue", "purple", "orange"]
 
-python script.py [arguments]
+def create_aprs_image(data, output_path, image_width, image_height, font_path, banner_title,
+                      banner_background_color, banner_text_color, row_text_color, row_colors):
+    """
+    Create an image with APRS data.
+    """
+    # Create a blank image
+    image = Image.new("RGB", (image_width, image_height), banner_background_color)
+    draw = ImageDraw.Draw(image)
 
-Example Usage:
+    # Load fonts
+    font_title = ImageFont.truetype(font_path, size=int(image_height * 0.1))
+    font_row = ImageFont.truetype(font_path, size=int(image_height * 0.07))
 
-    python script.py --log_file /path/to/logfile.log --output_image /tmp/direwatch.png --image_width 320 --image_height 240 --font_path /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf --banner_background_color navy --banner_text_color yellow --row_text_color white --row_colors red green blue purple orange
+    # Draw the banner
+    banner_height = int(image_height * 0.15)
+    draw.rectangle([0, 0, image_width, banner_height], fill=banner_background_color)
+    text_width, text_height = draw.textbbox((0, 0), banner_title, font=font_title)[2:]
+    draw.text(
+        ((image_width - text_width) / 2, (banner_height - text_height) / 2),
+        banner_title,
+        fill=banner_text_color,
+        font=font_title,
+    )
 
-Script Arguments
-Log File Options
-Argument	Default Value	Description
---log_file	/home/fcosta/digipi/direwolf.log	Path to the APRS log file. The script monitors this file in real time for new entries.
-Output Image Options
-Argument	Default Value	Description
---output_image	/tmp/direwatch.png	Path to save the generated PNG image.
---image_width	320	Width of the generated image in pixels.
---image_height	240	Height of the generated image in pixels.
-Font Options
-Argument	Default Value	Description
---font_path	/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf	Path to the font file used for text rendering. Must be a TrueType font (.ttf).
-Banner Options
-Argument	Default Value	Description
---banner_background_color	navy	Background color of the banner (e.g., red, #000080).
---banner_text_color	yellow	Text color of the banner (e.g., white, #FFFF00).
-Row Options
-Argument	Default Value	Description
---row_text_color	white	Text color for the rows (e.g., white, #FFFFFF).
---row_colors	["red", "green", "blue", "purple", "orange"]	Background colors for rows. Cycles through these colors for each row.
-Columns in the Log File
+    # Draw rows of data
+    row_height = (image_height - banner_height) // len(data)
+    for i, (key, value) in enumerate(data.items()):
+        row_y = banner_height + i * row_height
+        row_color = row_colors[i % len(row_colors)]
+        draw.rectangle([0, row_y, image_width, row_y + row_height], fill=row_color)
 
-The log file contains the following columns (data fields). Each column represents specific information extracted during an APRS transmission:
-Column Name	Description
-chan	Channel number.
-utime	Unix timestamp of the transmission.
-isotime	ISO 8601 formatted timestamp of the transmission.
-source	Source callsign of the transmission.
-heard	Destination or relay callsign heard by the source.
-level	Signal level (e.g., 14(3/2) for raw level, SNR).
-error	Error rate of the signal (e.g., 0 for no errors).
-dti	Data type identifier for the transmission.
-name	Name of the station or device.
-symbol	APRS symbol (e.g., /# for a station).
-latitude	Latitude coordinate of the source station. Truncated to 5 decimal places in the image.
-longitude	Longitude coordinate of the source station. Truncated to 5 decimal places in the image.
-speed	Speed of the source station (in km/h or mph).
-course	Direction of movement (in degrees).
-altitude	Altitude of the source station (in meters or feet).
-frequency	Operating frequency of the station.
-offset	Frequency offset (e.g., repeater shift).
-tone	Tone frequency for signaling (e.g., CTCSS/DCS).
-system	Type of device/system used (e.g., Kenwood TM-D700).
-status	Current status of the source station (e.g., In Service).
-telemetry	Additional telemetry data sent by the station.
-comment	User-defined comments or additional metadata.
-How Data is Processed
+        # Text for the row
+        text = f"{key}: {value}"
+        text_width, text_height = draw.textbbox((0, 0), text, font=font_row)[2:]
+        draw.text(
+            ((image_width - text_width) / 2, row_y + (row_height - text_height) / 2),
+            text,
+            fill=row_text_color,
+            font=font_row,
+        )
 
-    Parsing the Log:
-        The script monitors the specified log file in real-time and reads new lines as they are added.
-        Each line is parsed into a dictionary based on the columns listed above.
-        Invalid or missing data for key columns (e.g., latitude and longitude) is handled gracefully.
+    # Save the image
+    image.save(output_path)
 
-    Data Filtering:
-        Only rows with valid, non-empty data are included in the image generation process.
-        Latitude and longitude values are truncated to 5 decimal places.
+def parse_log_line(line):
+    """
+    Parse a single line from the Direwolf log.
+    """
+    columns = [
+        "chan", "utime", "isotime", "source", "heard", "level", "error", "dti",
+        "name", "symbol", "latitude", "longitude", "speed", "course", "altitude",
+        "frequency", "offset", "tone", "system", "status", "telemetry", "comment"
+    ]
+    values = line.strip().split(",")
+    return {columns[i]: values[i] if i < len(values) else "" for i in range(len(columns))}
 
-    Image Generation:
-        A banner at the top displays the title (APRS BPQ by default).
-        Below the banner, up to 5 rows of data are displayed with configurable background and text colors.
-        Rows cycle through the specified row_colors list for their background.
+def process_log_file(log_file, callback, columns):
+    """
+    Monitor the log file and process lines in real time.
+    """
+    with open(log_file, "r") as file:
+        # Start from the end of the file
+        file.seek(0, os.SEEK_END)
 
-Customizing Rows Displayed
+        while True:
+            line = file.readline()
+            if not line:
+                time.sleep(0.1)
+                continue
 
-The script is designed to display specific columns in the image. By default, it includes:
+            # Parse the log line and filter by selected columns
+            parsed_data = parse_log_line(line)
+            filtered_data = {key: parsed_data[key] for key in columns if parsed_data.get(key)}
+            
+            # Skip if no selected columns contain data
+            if not any(filtered_data.values()):
+                continue
 
-    source
-    heard
-    latitude
-    longitude
-    speed
+            callback(filtered_data)
 
-You can modify the script to include other columns or dynamically pass the desired columns through command-line arguments.
-Common Issues and Debugging
+if __name__ == "__main__":
+    # Argument parser
+    parser = argparse.ArgumentParser(description="Generate APRS image from Direwolf log data.")
+    parser.add_argument("--log_file", default=DEFAULT_LOG_FILE, help="Path to the log file.")
+    parser.add_argument("--output_image", default=DEFAULT_OUTPUT_IMAGE, help="Path to save the image.")
+    parser.add_argument("--image_width", type=int, default=DEFAULT_IMAGE_WIDTH, help="Width of the image.")
+    parser.add_argument("--image_height", type=int, default=DEFAULT_IMAGE_HEIGHT, help="Height of the image.")
+    parser.add_argument("--font_path", default=DEFAULT_FONT_PATH, help="Path to the font file.")
+    parser.add_argument("--banner_title", default=DEFAULT_BANNER_TITLE, help="Text to display in the banner.")
+    parser.add_argument("--columns", nargs="+", default=DEFAULT_COLUMNS, help="Columns to display in the image.")
+    parser.add_argument("--banner_background_color", default=DEFAULT_BANNER_BACKGROUND_COLOR, help="Background color of the banner.")
+    parser.add_argument("--banner_text_color", default=DEFAULT_BANNER_TEXT_COLOR, help="Text color of the banner.")
+    parser.add_argument("--row_text_color", default=DEFAULT_ROW_TEXT_COLOR, help="Text color for rows.")
+    parser.add_argument(
+        "--row_colors",
+        nargs="+",
+        default=DEFAULT_ROW_COLORS,
+        help="Background colors for rows.",
+    )
 
-    Font Issues:
-        Ensure the --font_path points to a valid .ttf font file. If missing, install fonts (e.g., sudo apt install fonts-dejavu).
+    args = parser.parse_args()
 
-    Colors Not Displaying:
-        Verify color names or hexadecimal values are valid (e.g., red, #FF0000).
+    # Generate the image for new log lines
+    def handle_parsed_data(data):
+        create_aprs_image(
+            data,
+            output_path=args.output_image,
+            image_width=args.image_width,
+            image_height=args.image_height,
+            font_path=args.font_path,
+            banner_title=args.banner_title,
+            banner_background_color=args.banner_background_color,
+            banner_text_color=args.banner_text_color,
+            row_text_color=args.row_text_color,
+            row_colors=args.row_colors,
+        )
 
-    Log Parsing Errors:
-        If the script fails to parse the log file, ensure the file format matches the expected CSV-like format (comma-delimited).
+    process_log_file(args.log_file, handle_parsed_data, args.columns)
 
-Contact
+Instructions for Use
+Purpose
 
-If you encounter issues or need further assistance, feel free to ask for help!
+The script monitors a Direwolf log file in real time, extracts specific columns, and generates a custom APRS image displaying the information.
+Command-Line Arguments
+Argument	Purpose	Default
+--log_file	Path to the Direwolf log file to monitor.	/home/fcosta/digipi/direwolf.log
+--output_image	Path to save the generated image.	/tmp/direwatch.png
+--image_width	Width of the generated image in pixels.	320
+--image_height	Height of the generated image in pixels.	240
+--font_path	Path to the font file used for text rendering.	/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+--banner_title	Text to display in the banner at the top of the image.	APRS BPQ
+--columns	Columns from the Direwolf log to include in the image.	["source", "heard", "latitude", "longitude", "speed"]
+--banner_background_color	Background color of the banner.	navy
+--banner_text_color	Text color of the banner.	yellow
+--row_text_color	Text color of the rows displaying the data.	white
+--row_colors	Background colors for rows, cycling through the list.	["red", "green", "blue", "purple", "orange"]
+Example Usage
+
+    Monitor a log file and generate a custom image:
+
+python script.py --log_file /path/to/direwolf.log --output_image /tmp/custom_aprs.png
+
+Customize the banner title:
+
+python script.py --banner_title "Custom APRS Display"
+
+Use specific columns for the display:
+
+python script.py --columns source heard latitude longitude
+
+Set custom colors:
+
+python script.py --banner_background_color black --banner_text_color white --row_text_col
