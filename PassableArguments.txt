@@ -15,3 +15,23 @@ Argument	Purpose	Default
 --banner_text_color	Text color of the banner.	yellow
 --row_text_color	Text color of the rows displaying the data.	white
 --row_colors	Background colors for rows, cycling through the list.	["red", "green", "blue", "purple", "orange"]
+
+
+Breakdown:
+
+    --log_file: Path to the Direwolf log file.
+    --output_file: Location where the image will be saved.
+    --font_path: Path to the TrueType font file.
+    --image_width: Width of the output image.
+    --image_height: Height of the output image.
+    --row_height: Height of each row in the image.
+    --banner_text: Text to display in the banner.
+    --banner_color: Background color of the banner.
+    --banner_text_color: Text color for the banner.
+    --rowX_text_color: Text color for each specific row (replace X with the row number, e.g., row1, row2, etc.).
+    --latitude_row: Whether to display the latitude row (True/False).
+    --longitude_row: Whether to display the longitude row (True/False).
+    --truncate_lat_lon: Truncate latitude and longitude to 5 decimal places (True/False).
+    --selected_columns: List of columns to display in the rows (comma-separated, e.g., source,heard,latitude,longitude,system).
+
+Adjust the arguments as per your requirements!
