@@ -4,8 +4,8 @@ import time
 from PIL import Image, ImageDraw, ImageFont
 
 # Constants for default behavior
-DEFAULT_LOG_FILE = "/home/fcosta/digipi/direwolf.log"
-DEFAULT_OUTPUT_IMAGE = "/tmp/direwatch.png"
+DEFAULT_LOG_FILE = "/path/to/direwolf.log"
+DEFAULT_OUTPUT_IMAGE = "/path/to/direwatch.png"
 DEFAULT_IMAGE_WIDTH = 320
 DEFAULT_IMAGE_HEIGHT = 240
 DEFAULT_FONT_PATH = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
