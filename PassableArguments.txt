@@ -1,0 +1,17 @@
+Instructions for Use
+Purpose
+
+The script monitors a Direwolf log file in real time, extracts specific columns, and generates a custom APRS image displaying the information.
+Command-Line Arguments
+Argument	Purpose	Default
+--log_file	Path to the Direwolf log file to monitor.	/home/fcosta/digipi/direwolf.log
+--output_image	Path to save the generated image.	/tmp/direwatch.png
+--image_width	Width of the generated image in pixels.	320
+--image_height	Height of the generated image in pixels.	240
+--font_path	Path to the font file used for text rendering.	/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf
+--banner_title	Text to display in the banner at the top of the image.	APRS BPQ
+--columns	Columns from the Direwolf log to include in the image.	["source", "heard", "latitude", "longitude", "speed"]
+--banner_background_color	Background color of the banner.	navy
+--banner_text_color	Text color of the banner.	yellow
+--row_text_color	Text color of the rows displaying the data.	white
+--row_colors	Background colors for rows, cycling through the list.	["red", "green", "blue", "purple", "orange"]
